@@ -1,6 +1,6 @@
 name: Go
 
-on:
+on:Juypter Notebook
   push:
     branches: [ master ]
   pull_request:
