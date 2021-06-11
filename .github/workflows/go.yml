@@ -1,7 +1,6 @@
 name: Go
 
 on:Juypter Notebook
-  push:
     branches: [ master ]
   pull_request:
     branches: [ master ]
