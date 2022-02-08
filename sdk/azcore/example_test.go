@@ -1,4 +1,5 @@
-// +build go1.13
+//go:build go1.16
+// +build go1.16
 
 // Copyright 2017 Microsoft Corporation. All rights reserved.
 // Use of this source code is governed by an MIT
@@ -9,62 +10,26 @@ package azcore_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
-	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/log"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 )
 
-func ExamplePipeline_Do() {
-	req, err := azcore.NewRequest(context.Background(), http.MethodGet, "https://github.com/robots.txt")
-	if err != nil {
-		log.Fatal(err)
-	}
-	pipeline := azcore.NewPipeline(nil)
-	resp, err := pipeline.Do(req)
-	if err != nil {
-		log.Fatal(err)
-	}
-	robots, err := ioutil.ReadAll(resp.Body)
-	resp.Body.Close()
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Printf("%s", robots)
-}
-
-func ExampleRequest_SetBody() {
-	req, err := azcore.NewRequest(context.Background(), http.MethodPut, "https://contoso.com/some/endpoint")
-	if err != nil {
-		log.Fatal(err)
-	}
-	body := strings.NewReader("this is seekable content to be uploaded")
-	err = req.SetBody(azcore.NopCloser(body), "text/plain")
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func ExampleLogger_Should() {
-	// you can create your own logging classification as needed
-	const LogExpensiveThing azcore.LogClassification = "ExpensiveThing"
-	if azcore.Log().Should(LogExpensiveThing) {
-		// perform expensive calculation only when enabled
-		azcore.Log().Write(LogExpensiveThing, "expensive log message")
-	}
-}
-
-func ExampleLogger_SetClassifications() {
+// false positive by linter
+func ExampleSetEvents() { //nolint:govet
 	// only log HTTP requests and responses
-	azcore.Log().SetClassifications(azcore.LogRequest, azcore.LogResponse)
+	log.SetEvents(log.EventRequest, log.EventResponse)
 }
 
-func ExampleLogger_SetListener() {
+// false positive by linter
+func ExampleSetListener() { //nolint:govet
 	// a simple logger that writes to stdout
-	azcore.Log().SetListener(func(cls azcore.LogClassification, msg string) {
+	log.SetListener(func(cls log.Event, msg string) {
 		fmt.Printf("%s: %s\n", cls, msg)
 	})
 }
@@ -97,4 +62,26 @@ func ExampleNullValue() {
 	fmt.Println(string(b))
 	// Output:
 	// {"count":null}
+}
+
+func ExampleResponseError() {
+	pipeline := runtime.NewPipeline("module", "version", runtime.PipelineOptions{}, nil)
+	req, err := runtime.NewRequest(context.Background(), "POST", "https://fakecontainerregisty.azurecr.io/acr/v1/nonexisteng/_tags")
+	if err != nil {
+		panic(err)
+	}
+	resp, err := pipeline.Do(req)
+	var respErr *azcore.ResponseError
+	if errors.As(err, &respErr) {
+		// Handle Error
+		if respErr.StatusCode == http.StatusNotFound {
+			fmt.Printf("Repository could not be found: %v", respErr)
+		} else if respErr.StatusCode == http.StatusForbidden {
+			fmt.Printf("You do not have permission to access this repository: %v", respErr)
+		} else {
+			// ...
+		}
+	}
+	// Do something with response
+	fmt.Println(ioutil.ReadAll(resp.Body))
 }

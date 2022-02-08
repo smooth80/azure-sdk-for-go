@@ -1,4 +1,5 @@
-// +build go1.13
+//go:build go1.16
+// +build go1.16
 
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
@@ -89,5 +90,36 @@ func TestIsNullValueMapSlice(t *testing.T) {
 	m := NullValue(map[string]interface{}{}).(map[string]interface{})
 	if !IsNullValue(m) {
 		t.Fatal("expected null value for s")
+	}
+
+	type nullFields struct {
+		Map   map[string]int
+		Slice []string
+	}
+
+	nf := nullFields{}
+	if IsNullValue(nf.Map) {
+		t.Fatal("unexpected null map")
+	}
+	if IsNullValue(nf.Slice) {
+		t.Fatal("unexpected null slice")
+	}
+
+	nf.Map = map[string]int{}
+	nf.Slice = []string{}
+	if IsNullValue(nf.Map) {
+		t.Fatal("unexpected null map")
+	}
+	if IsNullValue(nf.Slice) {
+		t.Fatal("unexpected null slice")
+	}
+
+	nf.Map = NullValue(map[string]int{}).(map[string]int)
+	nf.Slice = NullValue([]string{}).([]string)
+	if !IsNullValue(nf.Map) {
+		t.Fatal("expected null map")
+	}
+	if !IsNullValue(nf.Slice) {
+		t.Fatal("expected null slice")
 	}
 }

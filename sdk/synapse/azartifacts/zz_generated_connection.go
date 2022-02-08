@@ -1,4 +1,5 @@
-// +build go1.13
+//go:build go1.16
+// +build go1.16
 
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
@@ -9,11 +10,12 @@ package azartifacts
 
 import (
 	"fmt"
+
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 )
 
 const scope = "https://dev.azuresynapse.net/.default"
-const telemetryInfo = "azsdk-go-azartifacts/v0.1.0"
+const telemetryInfo = "azsdk-go-azartifacts/v0.1.1"
 
 // ConnectionOptions contains configuration settings for the connection's pipeline.
 // All zero-value fields will be initialized with their default values.

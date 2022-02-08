@@ -1,4 +1,5 @@
-// +build go1.13
+//go:build go1.16
+// +build go1.16
 
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
@@ -8,9 +9,11 @@ package mock
 import (
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"sync"
 	"time"
 )
@@ -37,6 +40,9 @@ type Server struct {
 
 	// count tracks the number of requests that have been made.
 	count int
+
+	// determines whether all requests will be routed to the httptest Server by changing the Host of each request
+	routeAllRequestsToMockServer bool
 }
 
 func newServer() *Server {
@@ -122,7 +128,24 @@ func (s *Server) Do(req *http.Request) (*http.Response, error) {
 		resp := s.getResponse()
 		return nil, resp.err
 	}
-	resp, err := s.srv.Client().Do(req)
+	var err error
+	var resp *http.Response
+	if s.routeAllRequestsToMockServer {
+		var srvUrl *url.URL
+		originalURL := req.URL
+		mockUrl := *req.URL
+		srvUrl, err = url.Parse(s.srv.URL)
+		if err != nil {
+			return nil, fmt.Errorf("Unable to parse the test server URL: %v", err)
+		}
+		mockUrl.Host = srvUrl.Host
+		mockUrl.Scheme = srvUrl.Scheme
+		req.URL = &mockUrl
+		resp, err = s.srv.Client().Do(req)
+		req.URL = originalURL
+	} else {
+		resp, err = s.srv.Client().Do(req)
+	}
 	if err != nil {
 		return resp, err
 	}
@@ -151,7 +174,10 @@ func (s *Server) serveHTTP(w http.ResponseWriter, req *http.Request) {
 	if resp.delay > 0 {
 		time.Sleep(resp.delay)
 	}
-	resp.write(w)
+	err := resp.write(w)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // Requests returns the number of times an HTTP request was made.
@@ -221,6 +247,12 @@ func (fn fnSrvOpt) apply(s *Server) {
 	fn(s)
 }
 
+func WithTransformAllRequestsToTestServerUrl() ServerOption {
+	return fnSrvOpt(func(s *Server) {
+		s.routeAllRequestsToMockServer = true
+	})
+}
+
 // WithTLSConfig sets the given TLS config on server.
 func WithTLSConfig(cfg *tls.Config) ServerOption {
 	return fnSrvOpt(func(s *Server) {
@@ -259,7 +291,7 @@ type mockResponse struct {
 	pred    ResponsePredicate
 }
 
-func (mr mockResponse) write(w http.ResponseWriter) {
+func (mr mockResponse) write(w http.ResponseWriter) error {
 	if len(mr.headers) > 0 {
 		for k, v := range mr.headers {
 			for _, vv := range v {
@@ -272,8 +304,12 @@ func (mr mockResponse) write(w http.ResponseWriter) {
 	}
 	w.WriteHeader(mr.code)
 	if mr.body != nil {
-		w.Write(mr.body)
+		_, err := w.Write(mr.body)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // WithStatusCode sets the HTTP response's status code to the specified value.
